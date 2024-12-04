@@ -52,7 +52,7 @@ public class Oauth2TestApplication implements CommandLineRunner {
 		requestBody.add("username", "bhupendra");
 		requestBody.add("password", "admin");
 		requestBody.add("client_id", "api-gateway");
-		requestBody.add("client_secret", "voIdnvHLqSx5tnW37McFSDIiTe0oeFrI");
+		requestBody.add("client_secret", "2WRlLniLnkasSGfIPeBF0yaFCFoAq8ty");
 		requestBody.add("grant_type", "password");
 
 		log.info("Calling Token API");

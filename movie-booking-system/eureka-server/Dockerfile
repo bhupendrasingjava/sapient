@@ -1,16 +1,24 @@
-#Stage 1
-FROM maven:3.6.0-jdk-8
-COPY eureka-server /app
+# Stage 1: Build the application
+FROM maven:3.8.8-eclipse-temurin-17-alpine AS build
 WORKDIR /app
+
+# Copy the pom.xml and download dependencies
+COPY pom.xml .
+RUN mvn dependency:go-offline
+
+# Copy the rest of the source code and build the application
+COPY src ./src
 RUN mvn clean install
 
-#Stage 2
-FROM registry.comapanyname.com/base-images/alpine-java/alpine3.11-jre8:0.1
-RUN mkdir app
-EXPOSE 8094
-COPY --from=0 /app/target/eureka-server-*.jar /app/
+# Stage 2: Run the application
+FROM openjdk:17-jdk-slim
 WORKDIR /app
-RUN adduser bhupendra -D && chown -R bhupendra /app && chmod -R a+x /app
-USER bhupendra
-ENTRYPOINT java -jar eureka-server-*.jar
 
+# Copy the JAR file from the build stage
+COPY --from=build /app/target/eureka-server-0.0.1-SNAPSHOT.jar /app/eureka-server.jar
+
+# Expose the Eureka server port
+EXPOSE 8761
+
+# Command to run the Eureka server
+ENTRYPOINT ["java", "-jar", "/app/eureka-server.jar"]

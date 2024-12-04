@@ -1,47 +1,103 @@
 package com.example.bookingservice.controller;
 
-import com.example.bookingservice.entity.Booking;
-import com.example.bookingservice.service.BookingService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.bookingservice.dto.BookingDTO;
+import com.example.bookingservice.entity.Booking;
+import com.example.bookingservice.exception.InvalidPaymentMethodException;
+import com.example.bookingservice.factory.BookingFactory;
+import com.example.bookingservice.payment.CreditCardPayment;
+import com.example.bookingservice.payment.NetbankingPayment;
+import com.example.bookingservice.payment.PaymentStrategy;
+import com.example.bookingservice.payment.UPIPayment;
+import com.example.bookingservice.payment.WalletPayment;
+import com.example.bookingservice.service.BookingService;
+
 @RestController
-@RequestMapping("/api/bookings")
+@RequestMapping("/bookings")
 public class BookingController {
 
-    @Autowired
-    private BookingService bookingService;
+	@Autowired
+	private BookingService bookingService;
+	@Autowired
+	private UPIPayment upiPayment;
+	@Autowired
+	private NetbankingPayment netbankingPayment;
+	@Autowired
+	private CreditCardPayment creditCardPayment;
+	@Autowired
+	private WalletPayment walletPayment;
+	@Autowired
+	private BookingFactory ticketCounterBookingFactory;
 
-    @GetMapping
-    public List<Booking> getAllBookings() {
-        return bookingService.getAllBookings();
-    }
+	@Autowired
+	private BookingFactory paytmBookingFactory;
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Booking> getBookingById(@PathVariable Long id) {
-        Booking booking = bookingService.getBookingById(id);
-        return ResponseEntity.ok(booking);
-    }
+	@Autowired
+	private BookingFactory bookingAppBookingFactory;
 
-    @PostMapping
-    public ResponseEntity<Booking> addBooking(@RequestBody Booking booking) {
-        Booking savedBooking = bookingService.addBooking(booking);
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedBooking);
-    }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<Booking> updateBooking(@PathVariable Long id, @RequestBody Booking bookingDetails) {
-        Booking updatedBooking = bookingService.updateBooking(id, bookingDetails);
-        return ResponseEntity.ok(updatedBooking);
-    }
+	@PostMapping("/bookTickets")
+	public Booking bookTickets(@RequestBody BookingDTO bookingDTO) {
+		PaymentStrategy paymentStrategy = getPaymentStrategy(bookingDTO.getPaymentMethod());
+		BookingFactory bookingFactory = getBookingFactory(bookingDTO.getBookingChannel());
+		return bookingService.bookTickets(bookingDTO.getUserId(), bookingDTO.getTicketCount(), bookingDTO.getShowTime(),
+				bookingDTO.getTicketPrice(), paymentStrategy, bookingFactory);
+	}
 
-    @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteBooking(@PathVariable Long id) {
-        bookingService.deleteBooking(id);
-    }
+	@GetMapping("/{id}")
+	public Booking getBookingById(@PathVariable Long id) {
+		return bookingService.getBookingById(id);
+	}
+
+	@GetMapping
+	public List<Booking> getAllBookings() {
+		return bookingService.getAllBookings();
+	}
+
+	@PutMapping("/{id}")
+	public Booking updateBooking(@PathVariable Long id, @RequestBody Booking bookingDetails) {
+		return bookingService.updateBooking(id, bookingDetails);
+	}
+
+	@DeleteMapping("/{id}")
+	public void deleteBooking(@PathVariable Long id) {
+		bookingService.deleteBooking(id);
+	}
+
+	private PaymentStrategy getPaymentStrategy(String paymentMethod) {
+		switch (paymentMethod.toLowerCase()) {
+		case "upi":
+			return upiPayment;
+		case "netbanking":
+			return netbankingPayment;
+		case "creditcard":
+			return creditCardPayment;
+		case "wallet":
+			return walletPayment;
+		default:
+			throw new InvalidPaymentMethodException("Invalid payment method: " + paymentMethod);
+		}
+	}
+
+	private BookingFactory getBookingFactory(String bookingChannel) {
+		switch (bookingChannel) {
+		case "PaytmBookingChannel":
+			return this.paytmBookingFactory;
+		case "BookingAppBookingChannel":
+			return this.bookingAppBookingFactory;
+		default:
+			return this.ticketCounterBookingFactory;
+		}
+	}
 }

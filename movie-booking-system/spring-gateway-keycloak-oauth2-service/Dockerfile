@@ -1,16 +1,24 @@
-#Stage 1
-FROM maven:3.6.0-jdk-8
-COPY spring-gateway-keycloak-oauth2-service /app
+# Stage 1: Build the application
+FROM maven:3.8.8-eclipse-temurin-17-alpine AS build
 WORKDIR /app
-RUN mvn clean install
 
-#Stage 2
-FROM registry.comapanyname.com/base-images/alpine-java/alpine3.11-jre8:0.1
-RUN mkdir app
-EXPOSE 8094
-COPY --from=0 /app/target/spring-gateway-keycloak-oauth2-service-*.jar /app/
+# Copy the pom.xml and download dependencies
+COPY pom.xml .
+RUN mvn dependency:go-offline
+
+# Copy the rest of the source code and build the application
+COPY src ./src
+RUN mvn clean install -DskipTests
+
+# Stage 2: Run the application
+FROM openjdk:17-jdk-slim
 WORKDIR /app
-RUN adduser bhupendra -D && chown -R bhupendra /app && chmod -R a+x /app
-USER bhupendra
-ENTRYPOINT java -jar spring-gateway-keycloak-oauth2-service-*.jar
 
+# Copy the JAR file from the build stage
+COPY --from=build /app/target/api-gateway-0.0.1-SNAPSHOT.jar /app/gateway-service.jar
+
+# Expose the application port
+EXPOSE 8082
+
+# Command to run the application with config location
+ENTRYPOINT ["java", "-jar", "/app/gateway-service.jar", "--spring.config.location=/config/application.properties"]
